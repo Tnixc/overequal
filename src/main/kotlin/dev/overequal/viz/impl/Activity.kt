@@ -89,10 +89,10 @@ object MessagesPerDay : Visualization {
     }
 }
 
-/** Daily mean message length for 30+ message days, cyan gradient (CLT demo). */
+/** Daily mean message length, cyan gradient (CLT demo). */
 object CltDaily : Visualization {
     override val id = "clt_daily"
-    override val title = "Daily Mean Message Length (30+ message days)"
+    override val title = "Daily Mean Message Length"
     override val description = "Distribution of each day's mean message length."
 
     override fun render(ds: Dataset): ByteArray? {
@@ -105,7 +105,7 @@ object CltDaily : Visualization {
             total.merge(d, n.toLong(), Long::plus)
             count.merge(d, 1, Int::plus)
         }
-        val means = count.filterValues { it >= 30 }.map { (d, c) -> total.getValue(d).toDouble() / c }
+        val means = count.map { (d, c) -> total.getValue(d).toDouble() / c }
         if (means.isEmpty()) return null
         val (centers, freq) = histogram(means, 1.0)
         return Charts
@@ -121,10 +121,10 @@ object CltDaily : Visualization {
     }
 }
 
-/** Mean message length per member (50+ messages), purple gradient. */
+/** Mean message length per member, purple gradient. */
 object MessageLengthPerMember : Visualization {
     override val id = "message_length_per_member"
-    override val title = "Mean Message Length by Member (50+ messages)"
+    override val title = "Mean Message Length by Member"
     override val description = "Distribution of members' average message length."
 
     override fun render(ds: Dataset): ByteArray? {
@@ -136,7 +136,7 @@ object MessageLengthPerMember : Visualization {
             total.merge(m.authorName, n.toLong(), Long::plus)
             count.merge(m.authorName, 1, Int::plus)
         }
-        val means = count.filterValues { it >= 50 }.map { (u, c) -> total.getValue(u).toDouble() / c }
+        val means = count.map { (u, c) -> total.getValue(u).toDouble() / c }
         if (means.isEmpty()) return null
         val (centers, freq) = histogram(means, 2.0)
         return Charts

@@ -57,10 +57,10 @@ object SlursAggregate : Visualization {
     }
 }
 
-/** Average slurs + profanity per message, per member (1,000+ messages), stacked. */
+/** Average slurs + profanity per message, per member, stacked. */
 object SlursPerMessage : Visualization {
     override val id = "slurs_per_message"
-    override val title = "Slurs & Profanity per Message (1,000+ messages)"
+    override val title = "Slurs & Profanity per Message"
     override val description = "Per-member rate of slurs (red) and profanity (gray) per message."
     override val requiresContent = true
 
@@ -80,7 +80,6 @@ object SlursPerMessage : Visualization {
         }
         val rows =
             msgs
-                .filterValues { it >= 1000 }
                 .map { (name, n) ->
                     Triple(name, (slur[name] ?: 0).toDouble() / n, (prof[name] ?: 0).toDouble() / n)
                 }.sortedByDescending { it.second + it.third }
