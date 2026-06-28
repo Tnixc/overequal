@@ -13,9 +13,12 @@ re-implement in Kotlin**). Output uses Discord **Components V2**.
 - Option to **redact names and channel contents**.
 - Output uses **Components V2** embeds.
 - Kotlin, **formatted regularly** (spotless + ktlint).
-- **Prefer external dependencies** over hand-rolling features.
+- **Prefer external dependencies** over hand-rolling features → charts use **Kandy**.
 - Scraped messages must be **cached**; viz read from the cache, not a live re-scrape.
 - Visualization outputs must **reflect the time period of the data** (date range in title/footer).
+- **Generalize across all servers**: no hardcoded user/bot/highlight names; no account
+  merging (the reference's `april` case is ignored). Instead provide a **bot-exclusion
+  option** (`excludeBots`, keyed off the `isBot` flag).
 
 ## Conventions
 
@@ -33,6 +36,8 @@ re-implement in Kotlin**). Output uses Discord **Components V2**.
 - `com.discord4j:discord4j-core:3.3.2` — first STABLE release with full Components V2.
 - `kotlinx-coroutines-reactor:1.11.0` — bridge Reactor `Mono`/`Flux` ↔ coroutines.
 - `kotlinx-serialization-json:1.11.0` — cache (`merged.jsonl`-equivalent) format.
+- `kandy-lets-plot:0.8.4` — JetBrains' Kotlin plotting lib; transitively brings
+  `lets-plot-image-export`, so headless PNG export works with no native setup.
 - `kotlinx-cli:0.3.6` — headless local CLI for rendering.
 - `logback-classic:1.5.37`.
 
@@ -54,8 +59,7 @@ re-implement in Kotlin**). Output uses Discord **Components V2**.
 
 One JSON object per message. Key fields we use: `id`, `timestamp` (ISO-8601), `content`,
 `author{ id, name, nickname, isBot }`, `mentions[]` (author-shaped), `reactions[]`,
-`channel{ id, name, category }`, `guild{ id, name }`. Account-merge note: `april` is two
-ids merged under one canonical name (see data-format.md).
+`channel{ id, name, category }`, `guild{ id, name }`. 
 
 ## Visualization theme (see `datavis/config.py`)
 
@@ -79,10 +83,27 @@ dev.overequal
   components/             Components V2 builders
 ```
 
-Charting note: the matplotlib charts use per-bar gradients, RGBA heatmaps, donut leader
-lines and dual-font labels that no JVM charting lib reproduces faithfully, so charts are
-drawn on **Java2D** (the JVM platform 2D engine) via a thin themed toolkit, not a bespoke
-chart engine. Discord4J/serialization/etc. remain external deps per the user's preference.
+## Charting with Kandy (gotchas learned)
+
+Charts are built with the Kandy DSL and the Flexoki look in `viz/`:
+- `viz/Theme.kt` — palette/gradients as Kandy `Color`s.
+- `viz/ChartStyle.kt` — `Layout.flexoki(showLegend)` applies paper canvas, ink text,
+  faint major grid (`#C3C1B8`), no minor grid, legend hidden by default.
+- `viz/Render.kt` — `Plot.toPngBytes(scale, dpi)` via Lets-Plot `toBufferedImage` (no temp files).
+
+Gotchas:
+- The style sub-blocks (`global {}`, `legend {}`, `panel.grid {}`, `plotCanvas {}`) need
+  `import org.jetbrains.kotlinx.kandy.util.context.invoke` (the `SelfInvocationContext` op).
+- The Lets-Plot **style** translator rejects RGBA — style colours must be hex/named.
+- `plot {}`/`layout {}`/`categorical`/`barsH` live in different packages — see Main.kt imports.
+- Per-bar arbitrary colours: `fillColor(labels) { scale = categorical(*labels.zip(colors)) }`
+  with the legend hidden. Discrete axis order isn't data order — set it explicitly to keep
+  the most-active member at the top.
+- Set `-Djava.awt.headless=true` before rendering.
+
+Pixel-perfect parity with matplotlib (donut leader lines, dual fonts, RGBA heatmaps) is a
+non-goal; faithful intent + the Flexoki theme is. Discord4J/serialization/Kandy are all
+external deps per the user's preference.
 
 ## Status
 

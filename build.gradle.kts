@@ -26,6 +26,11 @@ dependencies {
     // JSON for the on-disk message cache (the merged.jsonl-equivalent corpus).
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
+    // Kandy (JetBrains' Kotlin plotting library, on Lets-Plot) renders every
+    // visualization. kandy-lets-plot transitively brings lets-plot-image-export,
+    // so headless PNG export via `plot.save(...)` works with no native setup.
+    implementation("org.jetbrains.kotlinx:kandy-lets-plot:0.8.4")
+
     // CLI flag parsing for headless / local rendering of visualizations.
     implementation("org.jetbrains.kotlinx:kotlinx-cli:0.3.6")
 
