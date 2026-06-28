@@ -16,10 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.reactor.awaitSingle
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Listens for live [MessageCreateEvent]s and appends each message to the
@@ -38,11 +35,6 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class MessageWatcher(private val cache: MessageCache) {
     private val log = LoggerFactory.getLogger(MessageWatcher::class.java)
-
-    /** Per-guild mutex protecting the meta read-modify-write cycle. */
-    private val metaLocks = ConcurrentHashMap<String, Mutex>()
-
-    private fun metaMutex(guildId: String): Mutex = metaLocks.getOrPut(guildId) { Mutex() }
 
     /**
      * Subscribes to [MessageCreateEvent]s on [gateway], launching a long-lived
@@ -67,7 +59,7 @@ class MessageWatcher(private val cache: MessageCache) {
         val category = (ch as? CategorizableChannel)?.category?.awaitFirstOrNull()?.name
         val guildName = ev.guild.awaitSingle().name
         val mentions =
-            message.userMentions.collectList().awaitSingle().map { u ->
+            message.userMentions.map { u ->
                 RawUser(u.id.asString(), u.username, u.globalName.orElse(null), u.isBot)
             }
 
@@ -85,11 +77,11 @@ class MessageWatcher(private val cache: MessageCache) {
 
         cache.appendBatch(guildId, listOf(rawMessage))
 
-        metaMutex(guildId).withLock {
+        cache.withMetaLock(guildId) {
             val existing = cache.meta(guildId)
             if (existing == null) {
                 log.warn("meta missing for guild {} despite cache existing; skipping cursor update", guildId)
-                return
+                return@withMetaLock
             }
             val channelId = ch.id.asString()
             val msgSnowflake = message.id.asLong()

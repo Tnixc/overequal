@@ -89,7 +89,7 @@ class Scraper(
         }
 
         val meta = state.toMeta()
-        cache.writeMeta(meta)
+        cache.withMetaLock(guildId) { cache.writeMeta(meta) }
         log.info("cache now holds {} messages for guild {} ({})", meta.messageCount, guild.name, guildId)
         return meta
     }
@@ -123,7 +123,7 @@ class Scraper(
             if (batch.isEmpty()) return
             cache.appendBatch(state.guildId, batch)
             state.record(ch.id.asString(), ch.name, batch.size, newestId)
-            cache.writeMeta(state.toMeta())
+            cache.withMetaLock(state.guildId) { cache.writeMeta(state.toMeta()) }
             batch.clear()
             onProgress?.invoke(ch.name, state.totalCount)
         }

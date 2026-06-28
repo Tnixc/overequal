@@ -1,10 +1,13 @@
 package dev.overequal.data
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.bufferedReader
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
@@ -25,6 +28,13 @@ class MessageCache(
     private val root: Path,
 ) {
     private val log = LoggerFactory.getLogger(MessageCache::class.java)
+
+    /** Per-guild mutex shared across all callers (Scraper and MessageWatcher) to guard meta read-modify-write. */
+    private val metaLocks = ConcurrentHashMap<String, Mutex>()
+
+    /** Run [block] while holding the per-guild meta lock. */
+    suspend fun <T> withMetaLock(guildId: String, block: suspend () -> T): T =
+        metaLocks.computeIfAbsent(guildId) { Mutex() }.withLock { block() }
 
     private val json =
         Json {
