@@ -50,7 +50,7 @@ object MentionScatter : Visualization {
     }
 }
 
-/** Hourly spread (entropy) vs messages per active week, for 200+ message members. */
+/** Hourly spread (entropy) vs messages per active week. */
 object SpreadVsRate : Visualization {
     override val id = "spread_vs_rate"
     override val title = "Hourly Spread vs Messages per Active Week"
@@ -65,7 +65,7 @@ object SpreadVsRate : Visualization {
             total.merge(m.authorName, 1, Int::plus)
             weeks.getOrPut(m.authorName) { HashSet() }.add(Time.isoWeekKey(m.timestamp))
         }
-        val names = total.filterValues { it >= 200 }.keys.toList()
+        val names = total.keys.toList()
         if (names.isEmpty()) return null
         val x = names.map { entropyBits(hours.getValue(it)) }
         val y = names.map { total.getValue(it).toDouble() / weeks.getValue(it).size }

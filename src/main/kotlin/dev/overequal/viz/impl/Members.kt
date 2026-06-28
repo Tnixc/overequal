@@ -33,10 +33,10 @@ object WeeklyRate : Visualization {
     }
 }
 
-/** Mentions received per message sent (1,000+ messages), magenta gradient. */
+/** Mentions received per message sent, magenta gradient. */
 object MentionRatio : Visualization {
     override val id = "mention_ratio"
-    override val title = "Mentions Received per Message Sent (1,000+ messages)"
+    override val title = "Mentions Received per Message Sent"
     override val description = "Signal-to-noise: how often a member is mentioned vs how much they post."
 
     override fun render(ds: Dataset): ByteArray? {
@@ -48,7 +48,6 @@ object MentionRatio : Visualization {
         }
         val rows =
             msgCount
-                .filterValues { it >= 1000 }
                 .map { (name, msgs) -> name to (received[name] ?: 0).toDouble() / msgs }
                 .sortedByDescending { it.second }
                 .take(30)
