@@ -321,9 +321,7 @@ class Bot(
         send(event, ComponentsV2.notice(text))
     }
 
-    private suspend fun handleBotInfo(
-        event: ChatInputInteractionEvent,
-    ) {
+    private suspend fun handleBotInfo(event: ChatInputInteractionEvent) {
         event.deferReply().awaitFirstOrNull()
         send(
             event,
