@@ -33,7 +33,9 @@ import org.slf4j.LoggerFactory
  * silently skipping all prior history in that channel. This is a deliberate
  * consequence of the scrape-first contract.
  */
-class MessageWatcher(private val cache: MessageCache) {
+class MessageWatcher(
+    private val cache: MessageCache,
+) {
     private val log = LoggerFactory.getLogger(MessageWatcher::class.java)
 
     /**
@@ -41,7 +43,10 @@ class MessageWatcher(private val cache: MessageCache) {
      * collect loop inside [scope]. The function returns immediately; the coroutine
      * lifetime is owned by [scope].
      */
-    fun watch(gateway: GatewayDiscordClient, scope: CoroutineScope) {
+    fun watch(
+        gateway: GatewayDiscordClient,
+        scope: CoroutineScope,
+    ) {
         scope.launch {
             gateway.on(MessageCreateEvent::class.java).asFlow().collect { ev ->
                 val guildId = ev.guildId.orElse(null)?.asString() ?: return@collect
@@ -52,7 +57,10 @@ class MessageWatcher(private val cache: MessageCache) {
         }
     }
 
-    private suspend fun handle(ev: MessageCreateEvent, guildId: String) {
+    private suspend fun handle(
+        ev: MessageCreateEvent,
+        guildId: String,
+    ) {
         val message = ev.message
         val author = message.author.orElse(null) ?: return
         val ch = message.channel.awaitSingle() as? GuildMessageChannel ?: return

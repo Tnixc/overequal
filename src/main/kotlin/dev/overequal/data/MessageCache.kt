@@ -33,8 +33,10 @@ class MessageCache(
     private val metaLocks = ConcurrentHashMap<String, Mutex>()
 
     /** Run [block] while holding the per-guild meta lock. */
-    suspend fun <T> withMetaLock(guildId: String, block: suspend () -> T): T =
-        metaLocks.computeIfAbsent(guildId) { Mutex() }.withLock { block() }
+    suspend fun <T> withMetaLock(
+        guildId: String,
+        block: suspend () -> T,
+    ): T = metaLocks.computeIfAbsent(guildId) { Mutex() }.withLock { block() }
 
     private val json =
         Json {
