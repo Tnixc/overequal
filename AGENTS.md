@@ -1,0 +1,89 @@
+# overequal — agent working notes
+
+A Discord bot (Kotlin + Discord4J) that scrapes a server's messages, caches them,
+and renders the data visualizations defined by the reference Python project under
+`./datavis` (a symlink; **reference only — do not modify, do not port verbatim,
+re-implement in Kotlin**). Output uses Discord **Components V2**.
+
+## Goal / requirements (from the user)
+
+- Discord bot built on **Discord4J** (https://github.com/Discord4J/Discord4J), **all Kotlin**.
+- Command to **scrape all messages** in the server, with parameters.
+- Commands to **run visualizations**, including a command to **run all** (the set in `./datavis`).
+- Option to **redact names and channel contents**.
+- Output uses **Components V2** embeds.
+- Kotlin, **formatted regularly** (spotless + ktlint).
+- **Prefer external dependencies** over hand-rolling features.
+- Scraped messages must be **cached**; viz read from the cache, not a live re-scrape.
+- Visualization outputs must **reflect the time period of the data** (date range in title/footer).
+
+## Conventions
+
+- **Git:** commit regularly at checkpoints with long, descriptive messages that read
+  like working notes (what/why, decisions, gotchas). **Never** add a `Co-Authored-By:
+  Claude` trailer; use the existing configured git identity (`Tnixc <tnixxc@gmail.com>`).
+- **Formatting:** `./gradlew spotlessApply` (ktlint 1.5.0) before committing code.
+- **Build/run:** `./gradlew build`, `./gradlew run --args="..."` for the headless CLI.
+- Don't commit the scraped corpus or rendered PNGs (see `.gitignore`).
+
+## Tech stack (versions pinned & verified on Maven Central)
+
+- Kotlin 2.4.0, Gradle 9.6.1 (wrapper), host JDK 26 but **target JVM 21**
+  (both `compileKotlin` jvmTarget and `java` source/targetCompatibility = 21).
+- `com.discord4j:discord4j-core:3.3.2` — first STABLE release with full Components V2.
+- `kotlinx-coroutines-reactor:1.11.0` — bridge Reactor `Mono`/`Flux` ↔ coroutines.
+- `kotlinx-serialization-json:1.11.0` — cache (`merged.jsonl`-equivalent) format.
+- `kotlinx-cli:0.3.6` — headless local CLI for rendering.
+- `logback-classic:1.5.37`.
+
+## Components V2 API (Discord4J 3.3.2, verified against the 3.3.2 source)
+
+- Top-level send: `event.deferReply()` then `event.createFollowup().withComponents(container).withFiles(...)`.
+  `withComponents(...)` auto-adds the `IS_COMPONENTS_V2` flag. With V2 you CANNOT set
+  `content`/`embeds`/`stickers`/`poll`.
+- `Container.of(Color color, TopLevelMessageComponent... children)` (Container IS a TopLevelMessageComponent).
+- `TextDisplay.of(String markdown)` (max 4000 chars) — markdown is supported.
+- `Separator.of(boolean visible, Separator.SpacingSize)`.
+- `MediaGallery.of(MediaGalleryItem...)`, `MediaGalleryItem.of(UnfurledMediaItem)`,
+  `UnfurledMediaItem.of("attachment://<filename>")`.
+- File upload: `MessageCreateFields.File.of("name.png", inputStream)`; reference it from a
+  component via `attachment://name.png`.
+- `Color` is `discord4j.rest.util.Color`.
+
+## Data format (see `datavis/data-format.md`)
+
+One JSON object per message. Key fields we use: `id`, `timestamp` (ISO-8601), `content`,
+`author{ id, name, nickname, isBot }`, `mentions[]` (author-shaped), `reactions[]`,
+`channel{ id, name, category }`, `guild{ id, name }`. Account-merge note: `april` is two
+ids merged under one canonical name (see data-format.md).
+
+## Visualization theme (see `datavis/config.py`)
+
+Flexoki palette (BLACK `#100F0F`, PAPER `#FFFCF0`, plus 50–950 ramps of red/orange/yellow/
+green/cyan/blue/purple/magenta/gray). Body serif font "IowanOldSt BT"; usernames in a
+dedicated token font (`Redacted-Regular.ttf` — a redaction font). Rules: per-bar frequency
+gradient (same hue, darker = larger); grid lines `BLACK @ alpha .25, lw .3` (.5 single-axis);
+most-active member at the TOP of bar charts. Fonts may be absent on other machines → fall
+back to logical Serif/Mono gracefully.
+
+## Architecture (planned)
+
+```
+dev.overequal
+  Main.kt                 CLI dispatcher (scrape/render headless) + bot launch
+  bot/                    Bot, command registry, slash commands
+  data/                   Models (serializable), MessageCache, Dataset (+ time period/stats)
+  scrape/                 Scraper (Discord4J -> cache)
+  redact/                 Redactor (names -> pseudonyms; content blanking)
+  viz/                    Theme, chart toolkit (Java2D), Visualization registry, impls
+  components/             Components V2 builders
+```
+
+Charting note: the matplotlib charts use per-bar gradients, RGBA heatmaps, donut leader
+lines and dual-font labels that no JVM charting lib reproduces faithfully, so charts are
+drawn on **Java2D** (the JVM platform 2D engine) via a thin themed toolkit, not a bespoke
+chart engine. Discord4J/serialization/etc. remain external deps per the user's preference.
+
+## Status
+
+See `git log` for the running checkpoint history.

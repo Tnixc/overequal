@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+
+# Secrets / runtime config
+.env
+*.local
+
+# Scraped corpus cache (can be large; never commit server data)
+/data/
+*.jsonl
+
+# Rendered chart output
+/out/
+*.png
+
+# The reference Python project (symlinked in, not ours to track)
+/datavis
