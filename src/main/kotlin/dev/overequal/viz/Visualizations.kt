@@ -13,6 +13,8 @@ import dev.overequal.viz.impl.MessageLength
 import dev.overequal.viz.impl.MessageLengthPerMember
 import dev.overequal.viz.impl.MessagesPerDay
 import dev.overequal.viz.impl.SharePie
+import dev.overequal.viz.impl.SlursAggregate
+import dev.overequal.viz.impl.SlursPerMessage
 import dev.overequal.viz.impl.SpreadDistribution
 import dev.overequal.viz.impl.SpreadVsRate
 import dev.overequal.viz.impl.Timeline
@@ -46,6 +48,8 @@ object Visualizations {
             CumulativeShare,
             CumulativeAbsolute,
             Top30Words,
+            SlursAggregate,
+            SlursPerMessage,
         )
 
     val byId: Map<String, Visualization> = all.associateBy { it.id }

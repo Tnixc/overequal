@@ -165,6 +165,50 @@ object Charts {
         }
 
     /**
+     * Horizontal stacked bars (e.g. slur + profanity rate per member). [labels]
+     * are in top-to-bottom order; [seriesOrder] stacks left→right within each bar;
+     * [values] maps each series name to its per-label values (aligned to [labels]).
+     */
+    fun stackedBarsH(
+        ds: Dataset,
+        title: String,
+        xLabel: String,
+        yLabel: String,
+        labels: List<String>,
+        seriesOrder: List<String>,
+        seriesColors: Map<String, Color>,
+        values: Map<String, List<Double>>,
+        showLegend: Boolean = true,
+        width: Int = 1100,
+        height: Int = 900,
+    ): Plot {
+        val yCol = ArrayList<String>()
+        val xCol = ArrayList<Double>()
+        val gCol = ArrayList<String>()
+        labels.forEachIndexed { i, label ->
+            for (s in seriesOrder) {
+                yCol.add(label)
+                xCol.add(values.getValue(s)[i])
+                gCol.add(s)
+            }
+        }
+        val data = mapOf("y" to yCol, "x" to xCol, "g" to gCol)
+        val scalePairs = seriesOrder.map { it to seriesColors.getValue(it) }.toTypedArray()
+        return plot(data) {
+            barsH {
+                y("y") {
+                    scale = categorical(categories = labels.asReversed())
+                    axis.name = yLabel
+                }
+                x("x") { axis.name = xLabel }
+                fillColor("g") { scale = categorical(*scalePairs) }
+                position = Position.stack()
+            }
+            layout { standard(title, ds, width, height, showLegend) }
+        }
+    }
+
+    /**
      * A heatmap whose cells are coloured by explicit per-cell colours. [xs]/[ys]
      * are parallel cell coordinates (categories) and [cellColors] the matching
      * colours; an identity categorical scale maps each distinct colour to itself.
