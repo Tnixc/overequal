@@ -230,7 +230,8 @@ class Scraper(
      * Snapshot a live [Reaction] into the cache shape. A custom emoji keeps its id +
      * name + animated flag; a unicode emoji stores the raw char as `name`. The
      * `code` shortcode is only present in the reference export, never live, so it's
-     * left null here ([RawEmoji.displayKey] falls back to the char).
+     * left null here ([RawEmoji.displayKey] converts the raw char to a renderable
+     * Unicode label for charts).
      */
     private fun discord4j.core.`object`.reaction.Reaction.toRaw(): RawReaction {
         val e = emoji

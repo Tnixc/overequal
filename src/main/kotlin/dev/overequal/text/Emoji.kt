@@ -36,7 +36,17 @@ object Emoji {
     /** Skin-tone modifiers (sit inside the 1F300–1F5FF block, so reject explicitly). */
     private val SKIN_TONES = 0x1F3FB..0x1F3FF
 
+    /** Regional indicators combine in pairs to form flag emoji. */
+    private val REGIONAL_INDICATORS = 0x1F1E6..0x1F1FF
+
     private fun isEmoji(cp: Int): Boolean = cp !in SKIN_TONES && RANGES.any { cp in it }
+
+    private fun isIgnoredModifier(cp: Int): Boolean {
+        val isZeroWidthJoiner = cp == 0x200D
+        val isVariationSelector = cp in 0xFE00..0xFE0F
+        val isCombiningKeycap = cp == 0x20E3
+        return cp in SKIN_TONES || isZeroWidthJoiner || isVariationSelector || isCombiningKeycap
+    }
 
     /**
      * A readable, font-renderable label for a unicode emoji codepoint: its lowercased
@@ -44,6 +54,44 @@ object Emoji {
      * `U+XXXX` form if the JVM has no name for it.
      */
     private fun unicodeLabel(cp: Int): String = Character.getName(cp)?.lowercase() ?: "u+%04x".format(cp)
+
+    private fun codePoints(text: String): List<Int> {
+        val cps = ArrayList<Int>()
+        var i = 0
+        while (i < text.length) {
+            val cp = text.codePointAt(i)
+            cps.add(cp)
+            i += Character.charCount(cp)
+        }
+        return cps
+    }
+
+    private fun regionalIndicatorLetter(cp: Int): Char = ('a'.code + cp - REGIONAL_INDICATORS.first).toChar()
+
+    /**
+     * A font-renderable label for a raw unicode emoji reaction. Live Discord
+     * scrapes only expose the raw glyph (no shortcode), but the chart font does
+     * not contain emoji glyphs; use Unicode names so labels do not render as
+     * tofu/blank boxes in headless charts.
+     */
+    fun unicodeDisplayLabel(raw: String): String? {
+        val meaningful = codePoints(raw).filterNot(::isIgnoredModifier)
+        if (meaningful.isEmpty()) return null
+
+        if (meaningful.size == 2 && meaningful.all { it in REGIONAL_INDICATORS }) {
+            return "flag ${meaningful.map(::regionalIndicatorLetter).joinToString("")}"
+        }
+
+        val emojiNames = meaningful.filter(::isEmoji).map(::unicodeLabel)
+        if (emojiNames.isNotEmpty()) return emojiNames.distinct().joinToString(" + ")
+
+        return meaningful
+            .filter { it > 0x7F }
+            .takeIf { it.isNotEmpty() }
+            ?.map(::unicodeLabel)
+            ?.distinct()
+            ?.joinToString(" + ")
+    }
 
     /** Every emoji occurrence in [content]: `:name:` for customs, the Unicode name for unicode. */
     fun extract(content: String): List<String> {
