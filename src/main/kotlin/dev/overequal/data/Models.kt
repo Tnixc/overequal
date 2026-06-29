@@ -1,5 +1,6 @@
 package dev.overequal.data
 
+import dev.overequal.text.Emoji
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -48,8 +49,9 @@ data class RawReaction(
  * The emoji of a reaction, mirroring `datavis/data-format.md`. A custom server
  * emoji has a non-blank [id] and a [name] (e.g. `pepeJAM`); a standard emoji has
  * [name] = the raw unicode char and (in the reference export) [code] = its
- * shortcode (e.g. `sob`). The shortcode is preferred for display because it always
- * renders as plain text; live scrapes have no shortcode and fall back to the char.
+ * shortcode (e.g. `sob`). The shortcode is preferred for display because it
+ * always renders as plain text; live scrapes have no shortcode, so they fall back
+ * to a renderable Unicode name instead of the raw glyph.
  */
 @Serializable
 data class RawEmoji(
@@ -61,12 +63,12 @@ data class RawEmoji(
     /**
      * The label to count/display this reaction under, or `null` if the emoji can't
      * be identified. Custom emojis → `:name:`; unicode → `:shortcode:` when known,
-     * else the raw char.
+     * else a Unicode character-name label.
      */
     fun displayKey(): String? {
         if (!id.isNullOrBlank()) return name?.takeIf { it.isNotBlank() }?.let { ":$it:" }
         code?.takeIf { it.isNotBlank() }?.let { return ":$it:" }
-        return name?.takeIf { it.isNotBlank() }
+        return name?.takeIf { it.isNotBlank() }?.let { Emoji.unicodeDisplayLabel(it) ?: it }
     }
 }
 
