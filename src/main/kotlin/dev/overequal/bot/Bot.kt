@@ -153,6 +153,11 @@ class Bot(
                     .name("bot-info")
                     .description("Show the running bot version (git commit hash)")
                     .build(),
+                ApplicationCommandRequest
+                    .builder()
+                    .name("export")
+                    .description("Upload cached messages to a temporary host (expires in 1 hour)")
+                    .build(),
             )
 
         gateway.restClient
@@ -215,6 +220,7 @@ class Bot(
                 "viz-all" -> handleVizAll(event, guildId)
                 "status" -> handleStatus(event, guildId)
                 "bot-info" -> handleBotInfo(event)
+                "export" -> handleExport(event, guildId)
             }
         } catch (e: Exception) {
             log.error("command {} failed: {}", event.commandName, e.message, e)
@@ -340,6 +346,53 @@ class Bot(
             ComponentsV2.notice(
                 "## 🤖 Bot info\n**Version (git commit):** `$gitHash`",
             ),
+        )
+    }
+
+    private suspend fun handleExport(
+        event: ChatInputInteractionEvent,
+        guildId: String,
+    ) {
+        event.deferReply().awaitFirstOrNull()
+
+        if (!cache.hasCache(guildId)) {
+            send(event, ComponentsV2.notice("📭 No data cached yet. Run `/scrape` first."))
+            return
+        }
+
+        val meta =
+            cache.meta(guildId)
+                ?: run {
+                    send(event, ComponentsV2.notice("⚠️ Could not read cache metadata."))
+                    return
+                }
+
+        val path = cache.messagesPath(guildId)
+        val content =
+            withContext(Dispatchers.IO) {
+                java.nio.file.Files
+                    .readAllBytes(path)
+            }
+
+        val filename = "overequal-$guildId.jsonl"
+        val result = withContext(Dispatchers.IO) { Export.upload(content, filename) }
+
+        result.fold(
+            onSuccess = { url ->
+                send(
+                    event,
+                    ComponentsV2.notice(
+                        "## 📤 Exported to litterbox\n" +
+                            "**${"%,d".format(meta.messageCount)}** messages uploaded.\n" +
+                            "Expires in **1 hour**.\n" +
+                            "URL: $url",
+                    ),
+                )
+            },
+            onFailure = { e ->
+                log.error("export failed: {}", e.message, e)
+                send(event, ComponentsV2.notice("⚠️ Export failed: ${e.message}"))
+            },
         )
     }
 
