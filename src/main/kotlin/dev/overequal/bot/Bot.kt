@@ -75,6 +75,25 @@ class Bot(
             val appId = gateway.restClient.applicationId.awaitSingle()
             log.info("logged in; application id {}", appId)
 
+            // Register for guilds we're already in. We enumerate over REST rather
+            // than relying on GuildCreateEvent for these: the gateway's default
+            // (buffering) dispatcher replays the startup event burst only to the
+            // FIRST subscriber, so with two independent on(...) collectors the
+            // GuildCreateEvent one can lose the race and silently skip startup
+            // registration (no "registered N commands" line; newly added commands
+            // never appear while previously-registered ones persist on Discord's
+            // side). REST is a direct call, unaffected by that race.
+            scope.launch {
+                gateway.restClient.guilds.asFlow().collect { g ->
+                    runCatching { registerCommands(gateway, appId, g.id().asLong()) }
+                        .onFailure { log.error("command registration failed for {}: {}", g.name(), it.message) }
+                }
+            }
+
+            // Guilds joined while the bot is running: the collector is already
+            // attached by now, so there's no startup-burst race here. Re-running
+            // for a guild already handled above is harmless (bulkOverwrite is
+            // idempotent).
             scope.launch {
                 gateway.on(GuildCreateEvent::class.java).asFlow().collect { ev ->
                     runCatching { registerCommands(gateway, appId, ev.guild.id.asLong()) }
