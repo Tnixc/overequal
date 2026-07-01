@@ -13,6 +13,7 @@ import discord4j.core.GatewayDiscordClient
 import discord4j.core.event.domain.guild.GuildCreateEvent
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent
 import discord4j.core.`object`.command.ApplicationCommandOption
+import discord4j.core.`object`.entity.Guild
 import discord4j.discordjson.json.ApplicationCommandOptionChoiceData
 import discord4j.discordjson.json.ApplicationCommandOptionData
 import discord4j.discordjson.json.ApplicationCommandRequest
@@ -387,24 +388,64 @@ class Bot(
                 }
 
         val path = cache.messagesPath(guildId)
-        val content =
+        val raw =
             withContext(Dispatchers.IO) {
                 java.nio.file.Files
                     .readAllBytes(path)
             }
 
-        val filename = "overequal-$guildId.jsonl"
-        val result = withContext(Dispatchers.IO) { Export.upload(content, filename) }
+        // The inline-attachment ceiling isn't fixed: Discord raises it with the
+        // guild's boost tier. Read the live tier and size the branch accordingly,
+        // falling back to the base 10 MiB if the guild can't be fetched.
+        val premiumTier =
+            event
+                .interaction
+                .guild
+                .awaitFirstOrNull()
+                ?.premiumTier
+        val uploadLimit = uploadLimitFor(premiumTier)
+
+        // Compress first: it shrinks both the direct-upload payload and the
+        // ciphertext, and decides which branch we take (against the upload limit).
+        val compressed = withContext(Dispatchers.Default) { Export.compress(raw) }
+        val messages = "%,d".format(meta.messageCount)
+
+        if (compressed.size <= uploadLimit) {
+            // Small enough to send inline — no third party, no encryption needed.
+            send(
+                event,
+                ComponentsV2.fileNotice(
+                    markdown =
+                        "## 📤 Export\n" +
+                            "**$messages** messages, zstd-compressed to **${humanBytes(compressed.size)}**.\n" +
+                            "Attached directly below.",
+                    filename = "overequal-$guildId.jsonl.zst",
+                    bytes = compressed,
+                ),
+            )
+            return
+        }
+
+        // Too big to attach: encrypt with a one-time random key and upload the
+        // ciphertext to litterbox. The key travels in the message, not the file,
+        // so the host only ever sees opaque bytes.
+        val encrypted = withContext(Dispatchers.Default) { Export.encrypt(compressed) }
+        val filename = "overequal-$guildId.jsonl.zst.enc"
+        val result = withContext(Dispatchers.IO) { Export.upload(encrypted.payload, filename) }
 
         result.fold(
             onSuccess = { url ->
                 send(
                     event,
                     ComponentsV2.notice(
-                        "## 📤 Exported to litterbox\n" +
-                            "**${"%,d".format(meta.messageCount)}** messages uploaded.\n" +
+                        "## 📤 Exported to litterbox (encrypted)\n" +
+                            "**$messages** messages, zstd-compressed then AES-256-GCM encrypted " +
+                            "(**${humanBytes(encrypted.payload.size)}**).\n" +
                             "Expires in **1 hour**.\n" +
-                            "URL: $url",
+                            "URL: $url\n" +
+                            "Key (base64): `${encrypted.keyBase64}`\n" +
+                            "Payload layout: `nonce(12B) || ciphertext || tag(16B)`, " +
+                            "then zstd-decompress the plaintext.",
                     ),
                 )
             },
@@ -414,6 +455,27 @@ class Bot(
             },
         )
     }
+
+    /** Renders a byte count as a short human-readable string (KiB/MiB). */
+    private fun humanBytes(n: Int): String =
+        when {
+            n >= 1 shl 20 -> "%.1f MiB".format(n / (1 shl 20).toDouble())
+            n >= 1 shl 10 -> "%.1f KiB".format(n / (1 shl 10).toDouble())
+            else -> "$n B"
+        }
+
+    /**
+     * The per-file attachment ceiling for a guild, in bytes. Discord doesn't
+     * expose the limit as a field; it's a function of the boost ([PremiumTier])
+     * level: base/T1 = 10 MiB, T2 = 50 MiB, T3 = 100 MiB. Anything unknown
+     * (including a guild we couldn't fetch) falls back to the base 10 MiB.
+     */
+    private fun uploadLimitFor(tier: Guild.PremiumTier?): Int =
+        when (tier) {
+            Guild.PremiumTier.TIER_2 -> 50 * 1024 * 1024
+            Guild.PremiumTier.TIER_3 -> 100 * 1024 * 1024
+            else -> 10 * 1024 * 1024
+        }
 
     // --- helpers ------------------------------------------------------------
 

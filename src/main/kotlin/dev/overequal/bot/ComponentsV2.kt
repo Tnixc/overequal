@@ -2,6 +2,7 @@ package dev.overequal.bot
 
 import dev.overequal.viz.Visualization
 import discord4j.core.`object`.component.Container
+import discord4j.core.`object`.component.File
 import discord4j.core.`object`.component.ICanBeUsedInContainerComponent
 import discord4j.core.`object`.component.MediaGallery
 import discord4j.core.`object`.component.MediaGalleryItem
@@ -66,5 +67,25 @@ object ComponentsV2 {
         val children: List<ICanBeUsedInContainerComponent> =
             listOf(TextDisplay.of(markdown), Separator.of())
         return V2Message(listOf(Container.of(accent, children)), emptyList())
+    }
+
+    /**
+     * A text notice plus a downloadable file attachment. The [bytes] are uploaded
+     * under [filename] and referenced from a Components V2 [File] component so the
+     * client shows it as a native, downloadable attachment (not an image).
+     */
+    fun fileNotice(
+        markdown: String,
+        filename: String,
+        bytes: ByteArray,
+        accent: Color = ACCENT,
+    ): V2Message {
+        val upload = MessageCreateFields.File.of(filename, ByteArrayInputStream(bytes))
+        val children: List<ICanBeUsedInContainerComponent> =
+            listOf(
+                TextDisplay.of(markdown),
+                File.of(UnfurledMediaItem.of("attachment://$filename")),
+            )
+        return V2Message(listOf(Container.of(accent, children)), listOf(upload))
     }
 }

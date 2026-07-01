@@ -34,6 +34,11 @@ dependencies {
     // CLI flag parsing for headless / local rendering of visualizations.
     implementation("org.jetbrains.kotlinx:kotlinx-cli:0.3.6")
 
+    // zstd (via JNI) compresses the exported corpus before it is sent to
+    // Discord / litterbox. zstd-jni bundles the native libs for every platform
+    // in the jar, so there is no native setup step.
+    implementation("com.github.luben:zstd-jni:1.5.7-11")
+
     implementation("ch.qos.logback:logback-classic:1.5.37")
 
     testImplementation(kotlin("test"))
